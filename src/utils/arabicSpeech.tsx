@@ -192,11 +192,22 @@ class ArabicSpeechManager {
     this.loadingId = id;
     this.notify();
 
+    // Unlock an HTMLAudioElement synchronously inside the user click gesture
+    // so mobile Safari / Chrome allows .play() after async fetch completes
+    const unlockedAudio = new Audio();
+    unlockedAudio.preload = 'auto';
+    try {
+      unlockedAudio.load();
+    } catch {
+      // Ignore
+    }
+    this.currentAudio = unlockedAudio;
+
     try {
       // 1. Check IndexedDB offline cache first for instant playback
       let audioPayload = await getCachedAudio(cacheKey);
 
-      // 2. If not cached yet, request Natural Saudi Voice from server-side Gemini 3.8 Flash TTS
+      // 2. If not cached yet, request voice from /api/tts (Gemini 3.8 TTS or Vercel zero-config MP3 fallback)
       if (!audioPayload) {
         this.abortController = new AbortController();
         const response = await fetch('/api/tts', {
@@ -235,7 +246,7 @@ class ArabicSpeechManager {
         return;
       }
 
-      // 3. Play the natural Saudi WAV audio via Blob URL for reliable mobile playback
+      // 3. Play the audio via Blob URL on the gesture-unlocked HTMLAudioElement
       const byteCharacters = atob(audioPayload.audioBase64);
       const byteNumbers = new Array(byteCharacters.length);
       for (let i = 0; i < byteCharacters.length; i++) {
@@ -245,14 +256,14 @@ class ArabicSpeechManager {
       const blob = new Blob([byteArray], { type: audioPayload.mimeType });
       const blobUrl = URL.createObjectURL(blob);
 
-      const audio = new Audio(blobUrl);
-      audio.playbackRate = this.rate;
-      this.currentAudio = audio;
+      unlockedAudio.src = blobUrl;
+      unlockedAudio.playbackRate = this.rate;
+      this.currentAudio = unlockedAudio;
       this.loadingId = null;
       this.activeId = id;
       this.notify();
 
-      audio.onended = () => {
+      unlockedAudio.onended = () => {
         URL.revokeObjectURL(blobUrl);
         if (this.activeId === id) {
           this.activeId = null;
@@ -261,7 +272,7 @@ class ArabicSpeechManager {
         }
       };
 
-      audio.onerror = () => {
+      unlockedAudio.onerror = () => {
         URL.revokeObjectURL(blobUrl);
         if (this.activeId === id) {
           this.activeId = null;
@@ -270,7 +281,7 @@ class ArabicSpeechManager {
         }
       };
 
-      await audio.play();
+      await unlockedAudio.play();
     } catch (err: unknown) {
       if (this.isCancelled) return;
       console.warn('Server TTS unavailable, using device Arabic voice fallback:', err);
