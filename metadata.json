@@ -1,0 +1,6 @@
+{
+  "name": "مُنقذ إدارة المخاطر — مراجعة ليلة الامتحان",
+  "description": "منصة مراجعة مكثفة وحفظ سريع لمقرر إدارة المخاطر (المحاضرات 1-6 والشيتات) بالبطاقات الذكية، التكرار المتباعد، وشفرات الحفظ بدون إنترنت.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
