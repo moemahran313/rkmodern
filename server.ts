@@ -18,6 +18,15 @@ const ai = new GoogleGenAI({
   },
 });
 
+// Server-side in-memory audio cache to avoid redundant API calls & preserve quota
+const serverAudioCache = new Map<
+  string,
+  { audioBase64: string; mimeType: string; isNeuralSaudi: boolean }
+>();
+
+// Tracks cooldown timestamp when Gemini TTS free-tier rate limit (429) is reached
+let geminiQuotaCooldownUntil = 0;
+
 function splitTextIntoChunks(text: string, maxLen = 170): string[] {
   const words = text.split(/\s+/);
   const chunks: string[] = [];
@@ -64,7 +73,7 @@ async function startServer() {
 
   app.use(express.json({ limit: '2mb' }));
 
-  // Server-side Gemini 3.8 TTS endpoint with natural Saudi Arabic voice persona + zero-config fallback
+  // Server-side TTS endpoint with in-memory caching, quota cooldown guard, and zero-config MP3 fallback
   app.post('/api/tts', async (req, res) => {
     const { text, voiceGender = 'male' } = req.body as {
       text?: string;
@@ -77,9 +86,18 @@ async function startServer() {
     }
 
     const cleanText = text.trim();
-    const apiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
+    const cacheKey = `${voiceGender}::${cleanText}`;
 
-    if (apiKey && apiKey !== 'MY_GEMINI_API_KEY') {
+    const cached = serverAudioCache.get(cacheKey);
+    if (cached) {
+      res.json(cached);
+      return;
+    }
+
+    const apiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
+    const now = Date.now();
+
+    if (apiKey && apiKey !== 'MY_GEMINI_API_KEY' && now >= geminiQuotaCooldownUntil) {
       try {
         const voiceName = voiceGender === 'female' ? 'Kore' : 'Charon';
         const stylePrompt =
@@ -119,27 +137,35 @@ async function startServer() {
         const mimeType = inlineData?.mimeType || 'audio/wav';
 
         if (base64Audio) {
-          res.json({
+          const payload = {
             audioBase64: base64Audio,
             mimeType,
-          });
+            isNeuralSaudi: true,
+          };
+          serverAudioCache.set(cacheKey, payload);
+          res.json(payload);
           return;
         }
-      } catch (geminiError) {
-        console.warn('Gemini TTS error, using fallback MP3 TTS:', geminiError);
+      } catch (err: unknown) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        if (errMsg.includes('429') || errMsg.includes('RESOURCE_EXHAUSTED')) {
+          // Respect rate limit / daily quota cooldown silently without throwing server error logs
+          const isDailyQuota = errMsg.includes('PerDay');
+          geminiQuotaCooldownUntil = Date.now() + (isDailyQuota ? 30 * 60 * 1000 : 60 * 1000);
+        }
       }
     }
 
     try {
       const mp3Base64 = await synthesizeServerFallbackMp3(cleanText);
-      res.json({
+      const fallbackPayload = {
         audioBase64: mp3Base64,
         mimeType: 'audio/mpeg',
-      });
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'حدث خطأ أثناء توليد الصوت';
-      console.error('TTS error:', message);
-      res.status(500).json({ error: message });
+        isNeuralSaudi: false,
+      };
+      res.json(fallbackPayload);
+    } catch {
+      res.status(500).json({ error: 'حدث خطأ أثناء توليد الصوت' });
     }
   });
 

@@ -1,5 +1,16 @@
 import React, { useEffect, useState } from 'react';
-import { Smartphone, WifiOff, X, CheckCircle2, Share, PlusSquare, Download } from 'lucide-react';
+import {
+  Smartphone,
+  WifiOff,
+  X,
+  CheckCircle2,
+  Share,
+  PlusSquare,
+  Download,
+  Volume2,
+  Loader2,
+} from 'lucide-react';
+import { useArabicSpeech } from '../utils/arabicSpeech';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -93,7 +104,11 @@ export const OfflineToast: React.FC<{ isOnline: boolean }> = ({ isOnline }) => {
 
 export const PWAHeaderAction: React.FC = () => {
   const { isInstallable, isInstalled, isIOS, swReady, installApp } = usePWAAndOffline();
+  const { packStatus, downloadOfflineVoicePack } = useArabicSpeech();
   const [showModal, setShowModal] = useState(false);
+
+  const isAllVoicesCached =
+    packStatus.totalCount > 0 && packStatus.cachedCount >= packStatus.totalCount;
 
   const handleAction = async () => {
     if (isInstallable) {
@@ -150,6 +165,52 @@ export const PWAHeaderAction: React.FC = () => {
                   كل البطاقات الذكية، مؤقت التكرار المتباعد، معمل الحفظ العلمي (Blurting & القصص)، الـ 34 سؤالاً للشيتات، والـ 6 محاضرات مدمجة بالكامل داخل التطبيق نفسه وتعمل في وضع الطيران بدون إنترنت.
                 </p>
               </div>
+            </div>
+
+            {/* Offline Natural Voice Pack Downloader */}
+            <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-2.5">
+              <div className="flex items-center justify-between gap-2 text-xs">
+                <span className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                  <Volume2 className="w-4 h-4 text-emerald-600 dark:text-amber-400 shrink-0" />
+                  <span>حزمة الصوت الطبيعي للعمل بدون إنترنت:</span>
+                </span>
+                <span className="font-mono font-bold text-emerald-700 dark:text-amber-400">
+                  {packStatus.cachedCount} / {packStatus.totalCount}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed">
+                لأن الصوت الطبيعي يتم توليده عبر الذكاء الاصطناعي، اضغط الزر أدناه أثناء اتصالك بالإنترنت لتخزين جميع المقاطع الصوتية في ذاكرة هاتفك (IndexedDB) حتى لا يتحول الصوت إلى الآلي عند قطع الإنترنت.
+              </p>
+              <button
+                type="button"
+                onClick={downloadOfflineVoicePack}
+                disabled={packStatus.isDownloading || isAllVoicesCached}
+                className={`w-full min-h-[42px] rounded-xl text-xs font-bold flex items-center justify-center gap-2 cursor-pointer transition-colors ${
+                  isAllVoicesCached
+                    ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800'
+                    : 'bg-emerald-600 hover:bg-emerald-500 dark:bg-amber-500 dark:hover:bg-amber-400 text-white dark:text-slate-950'
+                }`}
+              >
+                {packStatus.isDownloading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>
+                      جاري تنزيل وحفظ الأصوات أوفلاين ({packStatus.cachedCount}/
+                      {packStatus.totalCount})...
+                    </span>
+                  </>
+                ) : isAllVoicesCached ? (
+                  <>
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>تم حفظ جميع الأصوات في ذاكرة جهازك أوفلاين ✓</span>
+                  </>
+                ) : (
+                  <>
+                    <Download className="w-4 h-4" />
+                    <span>تنزيل حزمة الصوت الطبيعي للعمل أوفلاين الآن</span>
+                  </>
+                )}
+              </button>
             </div>
 
             {/* Direct Install Button if browser supports beforeinstallprompt */}

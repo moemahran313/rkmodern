@@ -1,18 +1,41 @@
 import React, { useState, useEffect } from 'react';
-import { Volume2, Square, Loader2, Sparkles } from 'lucide-react';
+import { Volume2, Square, Loader2, Download, CheckCircle2 } from 'lucide-react';
+import { FLASHCARDS_DATA } from '../data/courseData';
 
 export type SaudiVoiceGender = 'male' | 'female';
+
+export interface OfflineVoicePackStatus {
+  cachedCount: number;
+  totalCount: number;
+  isDownloading: boolean;
+}
 
 type SpeechListener = (
   activeId: string | null,
   loadingId: string | null,
   currentRate: number,
-  voiceGender: SaudiVoiceGender
+  voiceGender: SaudiVoiceGender,
+  packStatus: OfflineVoicePackStatus
 ) => void;
 
-const IDB_NAME = 'risk_cram_saudi_tts_db_v2';
+const IDB_NAME = 'risk_cram_saudi_tts_db_v3';
 const IDB_STORE = 'audio_clips';
 const GENDER_STORAGE_KEY = 'risk_cram_saudi_voice_gender_v2';
+
+interface CachedAudioRecord {
+  audioBase64: string;
+  mimeType: string;
+  isNeuralSaudi?: boolean;
+}
+
+function hashTextKey(text: string, gender: SaudiVoiceGender): string {
+  let h = 2166136261;
+  for (let i = 0; i < text.length; i++) {
+    h ^= text.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return `txt_${gender}_${(h >>> 0).toString(36)}_${text.length}`;
+}
 
 function openAudioCacheDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -32,9 +55,7 @@ function openAudioCacheDB(): Promise<IDBDatabase> {
   });
 }
 
-async function getCachedAudio(
-  cacheKey: string
-): Promise<{ audioBase64: string; mimeType: string } | null> {
+async function getCachedAudio(cacheKey: string): Promise<CachedAudioRecord | null> {
   try {
     const db = await openAudioCacheDB();
     return await new Promise((resolve, reject) => {
@@ -49,10 +70,7 @@ async function getCachedAudio(
   }
 }
 
-async function setCachedAudio(
-  cacheKey: string,
-  value: { audioBase64: string; mimeType: string }
-): Promise<void> {
+async function setCachedAudio(cacheKey: string, value: CachedAudioRecord): Promise<void> {
   try {
     const db = await openAudioCacheDB();
     await new Promise<void>((resolve, reject) => {
@@ -77,6 +95,10 @@ class ArabicSpeechManager {
   private abortController: AbortController | null = null;
   private isCancelled = false;
 
+  private packCachedCount = 0;
+  private packTotalCount = FLASHCARDS_DATA.length;
+  private isDownloadingPack = false;
+
   constructor() {
     if (typeof window !== 'undefined') {
       try {
@@ -87,20 +109,42 @@ class ArabicSpeechManager {
       } catch {
         // Ignore
       }
+      // Request persistent storage so the browser never evicts offline Saudi voice clips
+      if (navigator.storage && navigator.storage.persist) {
+        navigator.storage.persist().catch(() => {});
+      }
+      setTimeout(() => {
+        this.refreshOfflinePackCount();
+      }, 400);
     }
+  }
+
+  private getPackStatus(): OfflineVoicePackStatus {
+    return {
+      cachedCount: this.packCachedCount,
+      totalCount: this.packTotalCount,
+      isDownloading: this.isDownloadingPack,
+    };
   }
 
   public subscribe(listener: SpeechListener): () => void {
     this.listeners.add(listener);
-    listener(this.activeId, this.loadingId, this.rate, this.voiceGender);
+    listener(
+      this.activeId,
+      this.loadingId,
+      this.rate,
+      this.voiceGender,
+      this.getPackStatus()
+    );
     return () => {
       this.listeners.delete(listener);
     };
   }
 
   private notify() {
+    const status = this.getPackStatus();
     this.listeners.forEach((l) =>
-      l(this.activeId, this.loadingId, this.rate, this.voiceGender)
+      l(this.activeId, this.loadingId, this.rate, this.voiceGender, status)
     );
   }
 
@@ -127,6 +171,7 @@ class ArabicSpeechManager {
     } catch {
       // Ignore
     }
+    this.refreshOfflinePackCount();
     this.notify();
   }
 
@@ -149,7 +194,7 @@ class ArabicSpeechManager {
     this.notify();
   }
 
-  private formatForNaturalSaudiSpeech(textSegments: string[]): string {
+  public formatForNaturalSaudiSpeech(textSegments: string[]): string {
     return textSegments
       .map((seg) =>
         seg
@@ -176,6 +221,102 @@ class ArabicSpeechManager {
       .join(' . ');
   }
 
+  // Checks how many flashcards have their Saudi voice saved in IndexedDB for offline use
+  public async refreshOfflinePackCount(): Promise<void> {
+    let count = 0;
+    for (const card of FLASHCARDS_DATA) {
+      const idKey = `fc-full-${card.id}__${this.voiceGender}__v3`;
+      const existing = await getCachedAudio(idKey);
+      if (existing && existing.audioBase64) {
+        count++;
+      }
+    }
+    this.packCachedCount = count;
+    this.packTotalCount = FLASHCARDS_DATA.length;
+    this.notify();
+  }
+
+  // Pre-fetches and stores a single item in IndexedDB without playing it aloud
+  public async prefetchAudioItem(id: string, textSegments: string[]): Promise<boolean> {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) return false;
+    const cleanFullText = this.formatForNaturalSaudiSpeech(textSegments);
+    if (!cleanFullText) return false;
+
+    const idKey = `${id}__${this.voiceGender}__v3`;
+    const textKey = hashTextKey(cleanFullText, this.voiceGender);
+
+    const existing = (await getCachedAudio(idKey)) || (await getCachedAudio(textKey));
+    if (existing && existing.audioBase64) {
+      return true;
+    }
+
+    try {
+      const response = await fetch('/api/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text: cleanFullText,
+          voiceGender: this.voiceGender,
+        }),
+      });
+
+      if (!response.ok) return false;
+      const data = (await response.json()) as {
+        audioBase64: string;
+        mimeType: string;
+        isNeuralSaudi?: boolean;
+      };
+      if (!data.audioBase64) return false;
+
+      const record: CachedAudioRecord = {
+        audioBase64: data.audioBase64,
+        mimeType: data.mimeType || 'audio/wav',
+        isNeuralSaudi: data.isNeuralSaudi !== false,
+      };
+      await setCachedAudio(idKey, record);
+      await setCachedAudio(textKey, record);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  // Downloads all Flashcard voices into IndexedDB so they work 100% offline in Airplane mode
+  public async downloadOfflineVoicePack(): Promise<void> {
+    if (this.isDownloadingPack) return;
+    this.isDownloadingPack = true;
+    this.notify();
+
+    try {
+      let count = 0;
+      for (const card of FLASHCARDS_DATA) {
+        const fullSegments = [
+          `السؤال: ${card.question}`,
+          `الخلاصة الفورية: ${card.shortAnswer}`,
+          ...card.bulletPoints,
+          `شفرة الحفظ: ${card.mnemonic}`,
+        ];
+        const shortSegments = [
+          `السؤال: ${card.question}`,
+          `شفرة الحفظ السريع: ${card.mnemonic}`,
+        ];
+
+        const okFull = await this.prefetchAudioItem(`fc-full-${card.id}`, fullSegments);
+        await this.prefetchAudioItem(`fc-q-${card.id}`, shortSegments);
+
+        if (okFull) {
+          count++;
+          this.packCachedCount = count;
+          this.notify();
+        }
+      }
+    } finally {
+      this.isDownloadingPack = false;
+      await this.refreshOfflinePackCount();
+      this.notify();
+    }
+  }
+
   public async speak(id: string, textSegments: string[]) {
     if (this.activeId === id || this.loadingId === id) {
       this.stop();
@@ -188,7 +329,10 @@ class ArabicSpeechManager {
     const cleanFullText = this.formatForNaturalSaudiSpeech(textSegments);
     if (!cleanFullText) return;
 
-    const cacheKey = `${id}__${this.voiceGender}__v2`;
+    const idKey = `${id}__${this.voiceGender}__v3`;
+    const legacyKey = `${id}__${this.voiceGender}__v2`;
+    const textKey = hashTextKey(cleanFullText, this.voiceGender);
+
     this.loadingId = id;
     this.notify();
 
@@ -204,10 +348,13 @@ class ArabicSpeechManager {
     this.currentAudio = unlockedAudio;
 
     try {
-      // 1. Check IndexedDB offline cache first for instant playback
-      let audioPayload = await getCachedAudio(cacheKey);
+      // 1. Check IndexedDB offline cache first (by ID, text hash, or legacy key)
+      let audioPayload =
+        (await getCachedAudio(idKey)) ||
+        (await getCachedAudio(textKey)) ||
+        (await getCachedAudio(legacyKey));
 
-      // 2. If not cached yet, request voice from /api/tts (Gemini 3.8 TTS or Vercel zero-config MP3 fallback)
+      // 2. If not cached yet, request voice from /api/tts
       if (!audioPayload) {
         this.abortController = new AbortController();
         const response = await fetch('/api/tts', {
@@ -227,6 +374,7 @@ class ArabicSpeechManager {
         const data = (await response.json()) as {
           audioBase64: string;
           mimeType: string;
+          isNeuralSaudi?: boolean;
         };
 
         if (!data.audioBase64) {
@@ -236,10 +384,13 @@ class ArabicSpeechManager {
         audioPayload = {
           audioBase64: data.audioBase64,
           mimeType: data.mimeType || 'audio/wav',
+          isNeuralSaudi: data.isNeuralSaudi !== false,
         };
 
-        // Save in IndexedDB so it plays 100% offline next time
-        await setCachedAudio(cacheKey, audioPayload);
+        // Save in IndexedDB under both ID and text hash so it plays 100% offline forever
+        await setCachedAudio(idKey, audioPayload);
+        await setCachedAudio(textKey, audioPayload);
+        this.refreshOfflinePackCount();
       }
 
       if (this.isCancelled || this.loadingId !== id) {
@@ -282,9 +433,8 @@ class ArabicSpeechManager {
       };
 
       await unlockedAudio.play();
-    } catch (err: unknown) {
+    } catch {
       if (this.isCancelled) return;
-      console.warn('Server TTS unavailable, using device Arabic voice fallback:', err);
       this.speakWithDeviceFallback(id, cleanFullText);
     }
   }
@@ -364,13 +514,19 @@ export function useArabicSpeech() {
   const [voiceGender, setVoiceGender] = useState<SaudiVoiceGender>(
     speechManager.getVoiceGender()
   );
+  const [packStatus, setPackStatus] = useState<OfflineVoicePackStatus>({
+    cachedCount: 0,
+    totalCount: FLASHCARDS_DATA.length,
+    isDownloading: false,
+  });
 
   useEffect(() => {
-    return speechManager.subscribe((id, loading, currentRate, gender) => {
+    return speechManager.subscribe((id, loading, currentRate, gender, status) => {
       setActiveId(id);
       setLoadingId(loading);
       setRate(currentRate);
       setVoiceGender(gender);
+      setPackStatus(status);
     });
   }, []);
 
@@ -379,10 +535,12 @@ export function useArabicSpeech() {
     loadingId,
     rate,
     voiceGender,
+    packStatus,
     speak: (id: string, segments: string[]) => speechManager.speak(id, segments),
     stop: () => speechManager.stop(),
     setRate: (r: number) => speechManager.setRate(r),
     setVoiceGender: (g: SaudiVoiceGender) => speechManager.setVoiceGender(g),
+    downloadOfflineVoicePack: () => speechManager.downloadOfflineVoicePack(),
   };
 }
 
@@ -457,32 +615,26 @@ export const ArabicVoiceButton: React.FC<ArabicVoiceButtonProps> = ({
 };
 
 export const VoiceSpeedSelector: React.FC = () => {
-  const { rate, setRate, voiceGender, setVoiceGender, activeId, loadingId, stop } =
-    useArabicSpeech();
+  const {
+    rate,
+    setRate,
+    activeId,
+    loadingId,
+    stop,
+    packStatus,
+    downloadOfflineVoicePack,
+  } = useArabicSpeech();
 
   const cycleRate = () => {
     const nextRate = rate === 1 ? 1.25 : rate === 1.25 ? 1.5 : 1;
     setRate(nextRate);
   };
 
-  const toggleGender = () => {
-    setVoiceGender(voiceGender === 'male' ? 'female' : 'male');
-  };
+  const isAllCached =
+    packStatus.totalCount > 0 && packStatus.cachedCount >= packStatus.totalCount;
 
   return (
     <div className="inline-flex flex-wrap items-center gap-1.5">
-      <button
-        type="button"
-        onClick={toggleGender}
-        className="min-h-[36px] px-2.5 py-1 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 border border-emerald-200 dark:border-emerald-800/60 text-xs font-bold text-emerald-800 dark:text-emerald-300 flex items-center gap-1 cursor-pointer whitespace-nowrap shrink-0"
-        title="تغيير نوع الصوت"
-      >
-        <Sparkles className="w-3.5 h-3.5 text-emerald-600 dark:text-amber-400 shrink-0" />
-        <span>
-          {voiceGender === 'male' ? 'الصوت: رجالي' : 'الصوت: نسائي'}
-        </span>
-      </button>
-
       <button
         type="button"
         onClick={cycleRate}
@@ -491,6 +643,41 @@ export const VoiceSpeedSelector: React.FC = () => {
       >
         <span>السرعة: </span>
         <span className="font-mono text-emerald-700 dark:text-amber-400">{rate}x</span>
+      </button>
+
+      <button
+        type="button"
+        onClick={downloadOfflineVoicePack}
+        disabled={packStatus.isDownloading || isAllCached}
+        className={`min-h-[36px] px-2.5 py-1 rounded-xl border text-xs font-bold flex items-center gap-1 cursor-pointer whitespace-nowrap shrink-0 transition-colors ${
+          isAllCached
+            ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800/60 text-emerald-700 dark:text-emerald-300'
+            : packStatus.isDownloading
+            ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-700 text-amber-800 dark:text-amber-300'
+            : 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200'
+        }`}
+        title="تنزيل الأصوات الطبيعية على جهازك لتعمل بدون إنترنت"
+      >
+        {packStatus.isDownloading ? (
+          <>
+            <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-600 dark:text-amber-400 shrink-0" />
+            <span>
+              جاري حفظ الصوت أوفلاين ({packStatus.cachedCount}/{packStatus.totalCount})
+            </span>
+          </>
+        ) : isAllCached ? (
+          <>
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+            <span>الصوت محفوظ أوفلاين ✓</span>
+          </>
+        ) : (
+          <>
+            <Download className="w-3.5 h-3.5 text-emerald-600 dark:text-amber-400 shrink-0" />
+            <span>
+              حفظ الصوت أوفلاين ({packStatus.cachedCount}/{packStatus.totalCount})
+            </span>
+          </>
+        )}
       </button>
 
       {(activeId || loadingId) && (

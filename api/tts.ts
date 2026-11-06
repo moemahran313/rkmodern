@@ -15,6 +15,13 @@ interface VercelResponse {
   json: (data: Record<string, unknown>) => void;
 }
 
+const serverAudioCache = new Map<
+  string,
+  { audioBase64: string; mimeType: string; isNeuralSaudi: boolean }
+>();
+
+let geminiQuotaCooldownUntil = 0;
+
 function splitTextIntoChunks(text: string, maxLen = 170): string[] {
   const words = text.split(/\s+/);
   const chunks: string[] = [];
@@ -74,10 +81,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const cleanText = text.trim();
-  const apiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
+  const cacheKey = `${voiceGender}::${cleanText}`;
 
-  // 1. Try Gemini 3.8 Flash TTS if API key is configured
-  if (apiKey && apiKey !== 'MY_GEMINI_API_KEY') {
+  const cached = serverAudioCache.get(cacheKey);
+  if (cached) {
+    res.status(200).json(cached);
+    return;
+  }
+
+  const apiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
+  const now = Date.now();
+
+  // 1. Try Gemini 3.8 Flash TTS if API key is configured and not in rate-limit cooldown
+  if (apiKey && apiKey !== 'MY_GEMINI_API_KEY' && now >= geminiQuotaCooldownUntil) {
     try {
       const ai = new GoogleGenAI({
         apiKey,
@@ -127,27 +143,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const mimeType = inlineData?.mimeType || 'audio/wav';
 
       if (base64Audio) {
-        res.status(200).json({
+        const payload = {
           audioBase64: base64Audio,
           mimeType,
-        });
+          isNeuralSaudi: true,
+        };
+        serverAudioCache.set(cacheKey, payload);
+        res.status(200).json(payload);
         return;
       }
-    } catch (geminiErr) {
-      console.warn('Gemini TTS failed on Vercel, falling back to server MP3 TTS:', geminiErr);
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      if (errMsg.includes('429') || errMsg.includes('RESOURCE_EXHAUSTED')) {
+        const isDailyQuota = errMsg.includes('PerDay');
+        geminiQuotaCooldownUntil = Date.now() + (isDailyQuota ? 30 * 60 * 1000 : 60 * 1000);
+      }
     }
   }
 
-  // 2. Zero-config Server MP3 TTS Fallback (works on Vercel even without GEMINI_API_KEY)
+  // 2. Zero-config Server MP3 TTS Fallback (works on Vercel even without GEMINI_API_KEY or when quota is reached)
   try {
     const mp3Base64 = await synthesizeServerFallbackMp3(cleanText);
     res.status(200).json({
       audioBase64: mp3Base64,
       mimeType: 'audio/mpeg',
+      isNeuralSaudi: false,
     });
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'حدث خطأ أثناء توليد الصوت';
-    console.error('Vercel TTS error:', message);
-    res.status(500).json({ error: message });
+  } catch {
+    res.status(500).json({ error: 'حدث خطأ أثناء توليد الصوت' });
   }
 }
