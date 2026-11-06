@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Eye, EyeOff, KeyRound, Search, CheckCircle2 } from 'lucide-react';
 import { SHEET_QUESTIONS_DATA, SheetQuestionItem } from '../data/quizAndSheetsData';
 import { ArabicVoiceButton, VoiceSpeedSelector } from '../utils/arabicSpeech';
+import { VisualRiskMatrix, RISK_MATRIX_PRESETS } from './VisualRiskMatrix';
 
 interface SheetsMemorizerViewProps {
   memorizedIds: string[];
@@ -256,7 +257,7 @@ export const SheetsMemorizerView: React.FC<SheetsMemorizerViewProps> = ({
                   </p>
                 </button>
               ) : (
-                <div className="space-y-3 bg-slate-50/80 dark:bg-slate-950/60 border border-slate-200/80 dark:border-slate-800/80 rounded-xl p-4">
+                <div className="space-y-4 bg-slate-50/80 dark:bg-slate-950/60 border border-slate-200/80 dark:border-slate-800/80 rounded-xl p-4">
                   {selfTestMode && (
                     <div className="flex justify-end">
                       <button
@@ -289,6 +290,24 @@ export const SheetsMemorizerView: React.FC<SheetsMemorizerViewProps> = ({
                       </ul>
                     </div>
                   ))}
+
+                  {/* Visual Risk Matrix Tables for Sheet 2 Risk Matrix Questions */}
+                  {q.id === 's2-q4' && (
+                    <div className="space-y-4 pt-2">
+                      <VisualRiskMatrix {...RISK_MATRIX_PRESETS.resignationVsFire} />
+                      <VisualRiskMatrix {...RISK_MATRIX_PRESETS.aswanVsHighDam} />
+                    </div>
+                  )}
+
+                  {(q.id === 's2-q5' || q.id === 's2-q6') && (
+                    <div className="pt-2">
+                      <VisualRiskMatrix
+                        headerBadge="مصفوفة معامل الخطر القياسية"
+                        title="درجة الخطورة = الاحتمال × العاقبة (أخضر ≤ 0.04 | أصفر 0.05–0.14 | أحمر ≥ 0.18)"
+                        conclusionText="الاحتمال على المحور الرأسي (0.1 إلى 0.9) والعاقبة على المحور الأفقي (0.05 إلى 0.80)"
+                      />
+                    </div>
+                  )}
                 </div>
               )}
             </article>

@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { CheckCircle2, XCircle, RotateCcw, HelpCircle, Award } from 'lucide-react';
 import { QUIZ_QUESTIONS_DATA, QuizQuestionItem } from '../data/quizAndSheetsData';
 import { ArabicVoiceButton, VoiceSpeedSelector } from '../utils/arabicSpeech';
+import { VisualRiskMatrix, RISK_MATRIX_PRESETS } from './VisualRiskMatrix';
 
 export const PracticeQuizView: React.FC = () => {
   const [filterType, setFilterType] = useState<'all' | QuizQuestionItem['type']>('all');
@@ -276,7 +277,7 @@ export const PracticeQuizView: React.FC = () => {
 
               {/* Instant Explanation */}
               {isAnswered && (
-                <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-4 space-y-2">
+                <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-4 space-y-3">
                   <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-700 dark:text-amber-400">
                     <HelpCircle className="w-4 h-4" />
                     <span>التفسير وخطوات الحل:</span>
@@ -287,6 +288,22 @@ export const PracticeQuizView: React.FC = () => {
                   {q.mnemonicTip && (
                     <div className="pt-1 text-xs font-bold text-emerald-700 dark:text-emerald-400">
                       شفرة التذكر: {q.mnemonicTip}
+                    </div>
+                  )}
+
+                  {q.id === 'q-15' && (
+                    <div className="pt-2">
+                      <VisualRiskMatrix {...RISK_MATRIX_PRESETS.resignationVsFire} compact />
+                    </div>
+                  )}
+                  {q.id === 'q-16' && (
+                    <div className="pt-2">
+                      <VisualRiskMatrix {...RISK_MATRIX_PRESETS.aswanVsHighDam} compact />
+                    </div>
+                  )}
+                  {q.id === 'q-17' && (
+                    <div className="pt-2">
+                      <VisualRiskMatrix {...RISK_MATRIX_PRESETS.towerCraneMaintenance} compact />
                     </div>
                   )}
                 </div>

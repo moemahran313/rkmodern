@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Calculator, KeyRound, ChevronDown, ChevronUp } from 'lucide-react';
 import { LECTURES_DATA } from '../data/courseData';
 import { ArabicVoiceButton, VoiceSpeedSelector } from '../utils/arabicSpeech';
+import { VisualRiskMatrix, RISK_MATRIX_PRESETS } from './VisualRiskMatrix';
 
 export const LectureSummariesView: React.FC = () => {
   const [activeLectureId, setActiveLectureId] = useState<number>(1);
@@ -10,28 +11,28 @@ export const LectureSummariesView: React.FC = () => {
   // Quick interactive sandbox state for Lecture 3, 4, 5 formulas
   const [r1, setR1] = useState<number>(0.9);
   const [r2, setR2] = useState<number>(0.8);
-  const [matrixP, setMatrixP] = useState<number>(0.7);
-  const [matrixC, setMatrixC] = useState<number>(0.4);
+  const [matrixP, setMatrixP] = useState<number>(0.5);
+  const [matrixC, setMatrixC] = useState<number>(0.2);
 
   const activeLecture = LECTURES_DATA.find((l) => l.id === activeLectureId) || LECTURES_DATA[0];
 
   const seriesReliability = (r1 * r2).toFixed(4);
   const parallelReliability = (1 - (1 - r1) * (1 - r2)).toFixed(4);
-  const matrixScore = Number((matrixP * matrixC).toFixed(3));
+  const matrixScore = Number((matrixP * matrixC).toFixed(2));
   const matrixZone =
     matrixScore >= 0.18
       ? {
-          label: 'منطقة حمراء (خطر شديد — أولوية قصوى ≥ 0.18)',
-          color: 'text-rose-600 dark:text-rose-400',
+          label: 'أحمر : خطر شديد (أولوية قصوى ≥ 0.18)',
+          tone: 'red' as const,
         }
-      : matrixScore >= 0.05
+      : matrixScore >= 0.045
       ? {
-          label: 'منطقة صفراء (خطر متوسط 0.05 – 0.14)',
-          color: 'text-amber-600 dark:text-amber-400',
+          label: 'أصفر : خطر متوسط (0.05 – 0.14)',
+          tone: 'yellow' as const,
         }
       : {
-          label: 'منطقة خضراء (خطر منخفض ≤ 0.04)',
-          color: 'text-emerald-600 dark:text-emerald-400',
+          label: 'أخضر : خطر منخفض (≤ 0.04)',
+          tone: 'green' as const,
         };
 
   return (
@@ -99,7 +100,7 @@ export const LectureSummariesView: React.FC = () => {
               className="min-h-[36px] inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-bold text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 cursor-pointer"
             >
               <Calculator className="w-3.5 h-3.5 text-emerald-600 dark:text-amber-400" />
-              <span>حاسبة القوانين التفاعلية</span>
+              <span>حاسبة القوانين ومصفوفة المخاطر التفاعلية</span>
               {showSandbox ? (
                 <ChevronUp className="w-3.5 h-3.5" />
               ) : (
@@ -132,13 +133,13 @@ export const LectureSummariesView: React.FC = () => {
 
         {/* Interactive Formula Sandbox (Collapsible) */}
         {showSandbox && (
-          <div className="bg-slate-50 dark:bg-slate-950 border border-emerald-500/30 dark:border-amber-500/30 rounded-xl p-4 mt-3 grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="bg-slate-50 dark:bg-slate-950 border border-emerald-500/30 dark:border-amber-500/30 rounded-xl p-4 mt-3 space-y-4">
             {/* Reliability Calculator */}
             <div className="space-y-2.5 bg-white dark:bg-slate-900/90 p-3.5 rounded-xl border border-slate-200 dark:border-slate-800">
               <h4 className="text-xs font-bold text-emerald-700 dark:text-amber-400">
                 1. حاسبة هندسة الموثوقية (توالي vs توازي — محاضرة 3)
               </h4>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[11px] text-slate-600 dark:text-slate-400 mb-1">
                     موثوقية المكون الأول (R1): {r1}
@@ -188,62 +189,41 @@ export const LectureSummariesView: React.FC = () => {
               </div>
             </div>
 
-            {/* Risk Matrix Calculator */}
-            <div className="space-y-2.5 bg-white dark:bg-slate-900/90 p-3.5 rounded-xl border border-slate-200 dark:border-slate-800">
-              <h4 className="text-xs font-bold text-emerald-700 dark:text-amber-400">
-                2. حاسبة مصفوفة المخاطر (P × C — محاضرة 4)
-              </h4>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[11px] text-slate-600 dark:text-slate-400 mb-1">
-                    الاحتمالية (P) من المقياس القياسي:
-                  </label>
-                  <select
-                    value={matrixP}
-                    onChange={(e) => setMatrixP(parseFloat(e.target.value))}
-                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-slate-100"
-                  >
-                    <option value={0.1}>0.1 (نادر جداً)</option>
-                    <option value={0.3}>0.3 (منخفض)</option>
-                    <option value={0.5}>0.5 (متوسط)</option>
-                    <option value={0.7}>0.7 (مرتفع)</option>
-                    <option value={0.9}>0.9 (شبه مؤكد)</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-[11px] text-slate-600 dark:text-slate-400 mb-1">
-                    الأثر / العاقبة (C) من المقياس القياسي:
-                  </label>
-                  <select
-                    value={matrixC}
-                    onChange={(e) => setMatrixC(parseFloat(e.target.value))}
-                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-slate-100"
-                  >
-                    <option value={0.05}>0.05 (ضئيل جداً)</option>
-                    <option value={0.1}>0.10 (طفيف)</option>
-                    <option value={0.2}>0.20 (معتدل)</option>
-                    <option value={0.4}>0.40 (كبير)</option>
-                    <option value={0.8}>0.80 (كارثي)</option>
-                  </select>
-                </div>
-              </div>
-              <div className="bg-slate-50 dark:bg-slate-950 p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 flex items-center justify-between">
-                <div>
-                  <div className="text-[11px] text-slate-500 dark:text-slate-400">
-                    درجة الخطر (Risk Score = P × C)
-                  </div>
-                  <div className={`text-xs font-bold mt-0.5 ${matrixZone.color}`}>
-                    {matrixZone.label}
-                  </div>
-                </div>
-                <div className="font-mono text-lg font-bold text-slate-900 dark:text-slate-100">
-                  {matrixScore}
-                </div>
-              </div>
-            </div>
+            {/* Interactive Visual Risk Matrix Sandbox */}
+            <VisualRiskMatrix
+              headerBadge="2. مصفوفة معامل الخطر التفاعلية (اضغط على أي خلية في الجدول)"
+              title="جرب اختيار أي احتمال وعاقبة مباشرة من الجدول"
+              markers={[
+                {
+                  p: matrixP,
+                  c: matrixC,
+                  badgeLetter: 'س',
+                  cardTitle: 'الخلية المختارة حالياً في المصفوفة',
+                  probText: `الاحتمال ← ${matrixP.toFixed(1)}`,
+                  consText: `العاقبة ← ${matrixC.toFixed(2)}`,
+                  equationText: `${matrixP.toFixed(1)} × ${matrixC.toFixed(2)} = ${matrixScore.toFixed(2)}`,
+                  statusLabel: matrixZone.label,
+                  statusTone: matrixZone.tone,
+                },
+              ]}
+              onSelectCell={(p, c) => {
+                setMatrixP(p);
+                setMatrixC(c);
+              }}
+            />
           </div>
         )}
       </div>
+
+      {/* Visual Risk Matrix Slide Examples for Lecture 4 */}
+      {activeLecture.id === 4 && (
+        <div className="space-y-4">
+          <VisualRiskMatrix {...RISK_MATRIX_PRESETS.resignationVsFire} />
+          <VisualRiskMatrix {...RISK_MATRIX_PRESETS.aswanVsHighDam} />
+          <VisualRiskMatrix {...RISK_MATRIX_PRESETS.towerCraneMaintenance} />
+          <VisualRiskMatrix {...RISK_MATRIX_PRESETS.threeEvaluatorsDiff} />
+        </div>
+      )}
 
       {/* Lecture Formulas if present */}
       {activeLecture.formulas && activeLecture.formulas.length > 0 && (

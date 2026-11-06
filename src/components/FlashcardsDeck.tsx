@@ -14,6 +14,7 @@ import {
   Brain,
 } from 'lucide-react';
 import { ArabicVoiceButton, VoiceSpeedSelector, speechManager } from '../utils/arabicSpeech';
+import { VisualRiskMatrix, RISK_MATRIX_PRESETS } from './VisualRiskMatrix';
 
 export interface CardScheduleState {
   dueAt: number | null; // timestamp in ms, null if new

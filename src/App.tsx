@@ -222,9 +222,14 @@ export default function App() {
           {/* Zone 1: Brand Wordmark */}
           <div className="flex items-center gap-2 shrink-0">
             <Sparkles className="w-4 h-4 text-emerald-600 dark:text-amber-400 shrink-0" />
-            <span className="font-bold text-sm sm:text-base text-slate-900 dark:text-slate-100 whitespace-nowrap">
-              مُنقذ إدارة المخاطر
-            </span>
+            <div className="flex flex-col leading-tight">
+              <span className="font-bold text-sm sm:text-base text-slate-900 dark:text-slate-100 whitespace-nowrap">
+                ادارة المخاطر
+              </span>
+              <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                محمد مهران - th-3
+              </span>
+            </div>
           </div>
 
           {/* Zone 2: Desktop Primary Navigation */}
