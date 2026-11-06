@@ -273,7 +273,70 @@ class ArabicSpeechManager {
       await audio.play();
     } catch (err: unknown) {
       if (this.isCancelled) return;
-      console.error('Gemini Saudi TTS error:', err);
+      console.warn('Server TTS unavailable, using device Arabic voice fallback:', err);
+      this.speakWithDeviceFallback(id, cleanFullText);
+    }
+  }
+
+  private speakWithDeviceFallback(id: string, text: string) {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+      this.loadingId = null;
+      this.activeId = null;
+      this.notify();
+      return;
+    }
+
+    try {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      const voices = window.speechSynthesis.getVoices();
+
+      // Prefer ar-SA (Saudi Arabic) or high-quality natural Arabic voices
+      const arVoices = voices.filter((v) => v.lang.toLowerCase().startsWith('ar'));
+      const preferredVoice =
+        arVoices.find(
+          (v) =>
+            v.lang.toLowerCase().includes('sa') &&
+            (v.name.toLowerCase().includes('natural') ||
+              v.name.toLowerCase().includes('hamed') ||
+              v.name.toLowerCase().includes('zariyah') ||
+              v.name.toLowerCase().includes('maged') ||
+              v.name.toLowerCase().includes('tarik'))
+        ) ||
+        arVoices.find((v) => v.lang.toLowerCase().includes('sa')) ||
+        arVoices.find((v) => v.name.toLowerCase().includes('natural')) ||
+        arVoices[0];
+
+      if (preferredVoice) {
+        utterance.voice = preferredVoice;
+        utterance.lang = preferredVoice.lang;
+      } else {
+        utterance.lang = 'ar-SA';
+      }
+
+      utterance.rate = this.rate;
+      utterance.pitch = 1.0;
+
+      this.loadingId = null;
+      this.activeId = id;
+      this.notify();
+
+      utterance.onend = () => {
+        if (this.activeId === id) {
+          this.activeId = null;
+          this.notify();
+        }
+      };
+
+      utterance.onerror = () => {
+        if (this.activeId === id) {
+          this.activeId = null;
+          this.notify();
+        }
+      };
+
+      window.speechSynthesis.speak(utterance);
+    } catch {
       this.loadingId = null;
       this.activeId = null;
       this.notify();
