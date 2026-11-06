@@ -143,11 +143,15 @@ async function startServer() {
     }
   });
 
+  const httpServer = (await import('http')).createServer(app);
+
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
       server: {
         middlewareMode: true,
-        hmr: false,
+        hmr: {
+          server: httpServer,
+        },
         watch: null,
       },
       appType: 'spa',
@@ -161,7 +165,7 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
+  httpServer.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on http://0.0.0.0:${PORT}`);
   });
 }
