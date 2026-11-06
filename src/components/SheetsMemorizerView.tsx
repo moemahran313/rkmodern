@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Eye, EyeOff, KeyRound, Search, CheckCircle2 } from 'lucide-react';
 import { SHEET_QUESTIONS_DATA, SheetQuestionItem } from '../data/quizAndSheetsData';
+import { ArabicVoiceButton, VoiceSpeedSelector } from '../utils/arabicSpeech';
 
 interface SheetsMemorizerViewProps {
   memorizedIds: string[];
@@ -65,15 +66,17 @@ export const SheetsMemorizerView: React.FC<SheetsMemorizerViewProps> = ({
               بنك أسئلة الشيتات الرسمية والامتحانات ({SHEET_QUESTIONS_DATA.length} سؤالاً كاملاً)
             </h2>
             <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-              إجابات نموذجية مركزة مع مفتاح الـ 3 ثوانٍ وشفرة الحفظ لكل سؤال مقالي أو مسألة
+              إجابات نموذجية مركزة مع القارئ الصوتي بالعربية ومفتاح الـ 3 ثوانٍ وشفرة الحفظ لكل سؤال
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            <VoiceSpeedSelector />
+
             <button
               type="button"
               onClick={handleToggleSelfTest}
-              className={`min-h-[38px] flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
+              className={`min-h-[36px] flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
                 selfTestMode
                   ? 'bg-emerald-600 dark:bg-amber-500 text-white dark:text-slate-950'
                   : 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700'
@@ -86,7 +89,7 @@ export const SheetsMemorizerView: React.FC<SheetsMemorizerViewProps> = ({
             <button
               type="button"
               onClick={() => setOnlyUnmemorized((prev) => !prev)}
-              className={`min-h-[38px] px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors cursor-pointer ${
+              className={`min-h-[36px] px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors cursor-pointer ${
                 onlyUnmemorized
                   ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-900 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-500/40'
                   : 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
@@ -175,6 +178,13 @@ export const SheetsMemorizerView: React.FC<SheetsMemorizerViewProps> = ({
           const isAnswerHidden = selfTestMode && !revealedIds[q.id];
           const totalBullets = q.answerBlocks.reduce((acc, blk) => acc + blk.points.length, 0);
 
+          const speechSegments: string[] = [
+            `السؤال رقم ${q.questionNumber}: ${q.questionText}`,
+            `الخلاصة الذهبية: ${q.goldenTrigger}`,
+            q.mnemonic ? `شفرة الحفظ: ${q.mnemonic}` : '',
+            ...q.answerBlocks.flatMap((blk) => [blk.title, ...blk.points]),
+          ];
+
           return (
             <article
               key={q.id}
@@ -185,7 +195,7 @@ export const SheetsMemorizerView: React.FC<SheetsMemorizerViewProps> = ({
               }`}
             >
               {/* Question Header */}
-              <div className="flex items-start justify-between gap-3 mb-3">
+              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 mb-3">
                 <div className="space-y-1">
                   <p className="text-xs text-slate-500 dark:text-slate-400">
                     {q.sheetName} · السؤال رقم {q.questionNumber}
@@ -195,18 +205,27 @@ export const SheetsMemorizerView: React.FC<SheetsMemorizerViewProps> = ({
                   </h3>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => onToggleMemorized(q.id)}
-                  className={`min-h-[36px] flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 transition-colors cursor-pointer ${
-                    isMemorized
-                      ? 'bg-emerald-600 text-white'
-                      : 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
-                  }`}
-                >
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>{isMemorized ? 'تم الحفظ ✓' : 'علّم كمحفوظ'}</span>
-                </button>
+                <div className="flex items-center gap-2 shrink-0">
+                  <ArabicVoiceButton
+                    id={`sheet-voice-${q.id}`}
+                    segments={speechSegments}
+                    label="استمع للسؤال والإجابة"
+                    activeLabel="إيقاف القراءة"
+                  />
+
+                  <button
+                    type="button"
+                    onClick={() => onToggleMemorized(q.id)}
+                    className={`min-h-[36px] flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 transition-colors cursor-pointer ${
+                      isMemorized
+                        ? 'bg-emerald-600 text-white'
+                        : 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
+                    }`}
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>{isMemorized ? 'تم الحفظ ✓' : 'علّم كمحفوظ'}</span>
+                  </button>
+                </div>
               </div>
 
               {/* Golden 3-Second Trigger + Mnemonic */}

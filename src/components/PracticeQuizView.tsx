@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { CheckCircle2, XCircle, RotateCcw, HelpCircle, Award } from 'lucide-react';
 import { QUIZ_QUESTIONS_DATA, QuizQuestionItem } from '../data/quizAndSheetsData';
+import { ArabicVoiceButton, VoiceSpeedSelector } from '../utils/arabicSpeech';
 
 export const PracticeQuizView: React.FC = () => {
   const [filterType, setFilterType] = useState<'all' | QuizQuestionItem['type']>('all');
@@ -57,11 +58,13 @@ export const PracticeQuizView: React.FC = () => {
               اختبار الميدتيرم التجريبي التفاعلي ({QUIZ_QUESTIONS_DATA.length} سؤالاً شاملاً)
             </h2>
             <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-              يغطي الأسئلة النظرية ومسائل الموثوقية ومصفوفة المخاطر وشجرة القرارات مع التفسير الفوري
+              يغطي الأسئلة النظرية ومسائل الموثوقية ومصفوفة المخاطر وشجرة القرارات مع القراءة الصوتية
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <VoiceSpeedSelector />
+
             <div className="text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 px-3.5 py-2 rounded-xl">
               <span className="text-slate-500 dark:text-slate-400">النتيجة: </span>
               <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
@@ -81,7 +84,7 @@ export const PracticeQuizView: React.FC = () => {
               <button
                 type="button"
                 onClick={handleResetQuiz}
-                className="min-h-[38px] flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 cursor-pointer"
+                className="min-h-[36px] flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 cursor-pointer"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
                 <span>إعادة الاختبار</span>
@@ -178,36 +181,53 @@ export const PracticeQuizView: React.FC = () => {
           const isAnswered = userChoice !== undefined;
           const isCorrect = userChoice === q.correctIndex;
 
+          const voiceSegments = isAnswered
+            ? [
+                q.question,
+                `الإجابة الصحيحة هي: ${q.options[q.correctIndex]}`,
+                `التفسير: ${q.explanation}`,
+              ]
+            : [q.question, ...q.options.map((o, i) => `الخيار ${i + 1}: ${o}`)];
+
           return (
             <article
               key={q.id}
               className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 sm:p-5 space-y-4 shadow-xs"
             >
-              <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+              <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500 dark:text-slate-400">
                 <span>
                   سؤال {index + 1} · المحاضرة {q.lectureId} · {q.type}
                 </span>
-                {isAnswered && (
-                  <span
-                    className={`font-bold flex items-center gap-1 ${
-                      isCorrect
-                        ? 'text-emerald-600 dark:text-emerald-400'
-                        : 'text-rose-600 dark:text-rose-400'
-                    }`}
-                  >
-                    {isCorrect ? (
-                      <>
-                        <CheckCircle2 className="w-4 h-4" />
-                        <span>إجابة صحيحة</span>
-                      </>
-                    ) : (
-                      <>
-                        <XCircle className="w-4 h-4" />
-                        <span>إجابة غير صحيحة</span>
-                      </>
-                    )}
-                  </span>
-                )}
+
+                <div className="flex items-center gap-2">
+                  <ArabicVoiceButton
+                    id={`quiz-voice-${q.id}`}
+                    segments={voiceSegments}
+                    label={isAnswered ? 'استمع للسؤال والتفسير' : 'استمع للسؤال والخيارات'}
+                  />
+
+                  {isAnswered && (
+                    <span
+                      className={`font-bold flex items-center gap-1 ${
+                        isCorrect
+                          ? 'text-emerald-600 dark:text-emerald-400'
+                          : 'text-rose-600 dark:text-rose-400'
+                      }`}
+                    >
+                      {isCorrect ? (
+                        <>
+                          <CheckCircle2 className="w-4 h-4" />
+                          <span>إجابة صحيحة</span>
+                        </>
+                      ) : (
+                        <>
+                          <XCircle className="w-4 h-4" />
+                          <span>إجابة غير صحيحة</span>
+                        </>
+                      )}
+                    </span>
+                  )}
+                </div>
               </div>
 
               <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100 leading-relaxed">

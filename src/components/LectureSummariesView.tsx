@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Calculator, KeyRound, ChevronDown, ChevronUp } from 'lucide-react';
 import { LECTURES_DATA } from '../data/courseData';
+import { ArabicVoiceButton, VoiceSpeedSelector } from '../utils/arabicSpeech';
 
 export const LectureSummariesView: React.FC = () => {
   const [activeLectureId, setActiveLectureId] = useState<number>(1);
@@ -37,13 +38,16 @@ export const LectureSummariesView: React.FC = () => {
     <div className="space-y-4 pb-24">
       {/* Top Lecture Selector Strip */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 space-y-3 shadow-xs">
-        <div>
-          <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100">
-            ملخصات المحاضرات الـ 6 المركزة (من الصفر للاحتراف)
-          </h2>
-          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-            كل محاضرة مقسمة إلى كبسولات حفظ سريع وجداول مقارنات وقوانين المسائل
-          </p>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100">
+              ملخصات المحاضرات الـ 6 المركزة (من الصفر للاحتراف)
+            </h2>
+            <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+              كل محاضرة مقسمة إلى كبسولات حفظ سريع وجداول مقارنات وقوانين المسائل مع قراءة صوتية
+            </p>
+          </div>
+          <VoiceSpeedSelector />
         </div>
 
         {/* 6 Lecture Buttons */}
@@ -75,19 +79,34 @@ export const LectureSummariesView: React.FC = () => {
           <span className="text-xs text-emerald-700 dark:text-amber-400 font-bold">
             المحاضرة {activeLecture.id} · {activeLecture.chapter}
           </span>
-          <button
-            type="button"
-            onClick={() => setShowSandbox((prev) => !prev)}
-            className="min-h-[38px] inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-bold text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 cursor-pointer"
-          >
-            <Calculator className="w-3.5 h-3.5 text-emerald-600 dark:text-amber-400" />
-            <span>حاسبة قوانين الموثوقية والمصفوفة التفاعلية</span>
-            {showSandbox ? (
-              <ChevronUp className="w-3.5 h-3.5" />
-            ) : (
-              <ChevronDown className="w-3.5 h-3.5" />
-            )}
-          </button>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <ArabicVoiceButton
+              id={`lec-overview-${activeLecture.id}`}
+              segments={[
+                activeLecture.title,
+                activeLecture.coreIdea,
+                activeLecture.mnemonicTitle,
+                activeLecture.mnemonicCode,
+                activeLecture.mnemonicExplanation,
+              ]}
+              label="استمع لخلاصة المحاضرة وشفرتها"
+            />
+
+            <button
+              type="button"
+              onClick={() => setShowSandbox((prev) => !prev)}
+              className="min-h-[36px] inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-bold text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 cursor-pointer"
+            >
+              <Calculator className="w-3.5 h-3.5 text-emerald-600 dark:text-amber-400" />
+              <span>حاسبة القوانين التفاعلية</span>
+              {showSandbox ? (
+                <ChevronUp className="w-3.5 h-3.5" />
+              ) : (
+                <ChevronDown className="w-3.5 h-3.5" />
+              )}
+            </button>
+          </div>
         </div>
 
         <h3 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-slate-100">
@@ -303,39 +322,53 @@ export const LectureSummariesView: React.FC = () => {
 
       {/* Lecture Structured Sections */}
       <div className="space-y-4">
-        {activeLecture.sections.map((sec, idx) => (
-          <section
-            key={idx}
-            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 sm:p-5 space-y-3.5 shadow-xs"
-          >
-            <h4 className="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100">
-              {sec.heading}
-            </h4>
+        {activeLecture.sections.map((sec, idx) => {
+          const secSpeech = [
+            sec.heading,
+            ...sec.keyPoints.map((kp) => `${kp.term}: ${kp.detail}`),
+          ];
 
-            <div className="grid grid-cols-1 gap-3">
-              {sec.keyPoints.map((kp, kpIdx) => (
-                <div
-                  key={kpIdx}
-                  className="bg-slate-50/80 dark:bg-slate-950/70 border border-slate-200/80 dark:border-slate-800/80 rounded-xl p-3.5 space-y-1.5"
-                >
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="text-xs sm:text-sm font-bold text-emerald-800 dark:text-amber-300">
-                      {kp.term}
-                    </span>
-                    {kp.highlight && (
-                      <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
-                        مفتاح التذكر: {kp.highlight}
+          return (
+            <section
+              key={idx}
+              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 sm:p-5 space-y-3.5 shadow-xs"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h4 className="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100">
+                  {sec.heading}
+                </h4>
+                <ArabicVoiceButton
+                  id={`lec-${activeLecture.id}-sec-${idx}`}
+                  segments={secSpeech}
+                  label="استمع لهذا القسم"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 gap-3">
+                {sec.keyPoints.map((kp, kpIdx) => (
+                  <div
+                    key={kpIdx}
+                    className="bg-slate-50/80 dark:bg-slate-950/70 border border-slate-200/80 dark:border-slate-800/80 rounded-xl p-3.5 space-y-1.5"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-xs sm:text-sm font-bold text-emerald-800 dark:text-amber-300">
+                        {kp.term}
                       </span>
-                    )}
+                      {kp.highlight && (
+                        <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
+                          مفتاح التذكر: {kp.highlight}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs sm:text-sm text-slate-700 dark:text-slate-200 leading-relaxed">
+                      {kp.detail}
+                    </p>
                   </div>
-                  <p className="text-xs sm:text-sm text-slate-700 dark:text-slate-200 leading-relaxed">
-                    {kp.detail}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </section>
-        ))}
+                ))}
+              </div>
+            </section>
+          );
+        })}
       </div>
     </div>
   );

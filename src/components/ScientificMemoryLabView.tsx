@@ -18,6 +18,7 @@ import {
   CLOZE_DRILLS_DATA,
   FEYNMAN_CARDS_DATA,
 } from '../data/scientificMemoryData';
+import { ArabicVoiceButton, VoiceSpeedSelector } from '../utils/arabicSpeech';
 
 type LabSubMode = 'blurting' | 'stories' | 'cloze' | 'feynman';
 
@@ -137,9 +138,10 @@ export const ScientificMemoryLabView: React.FC = () => {
               <span>معمل الحفظ العلمي السريع (لتثبيت المنهج في يوم واحد)</span>
             </h2>
             <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
-              تقنيات مثبتة علمياً: التفريغ الذهني (Blurting) · الربط القصصي (Story Chaining) · الاسترجاع النشط (Active Recall) · تبسيط فاينمان
+              تقنيات مثبتة علمياً مع القراءة الصوتية بالعربية: التفريغ الذهني · الربط القصصي · الاسترجاع النشط · تبسيط فاينمان
             </p>
           </div>
+          <VoiceSpeedSelector />
         </div>
 
         {/* 4 Scientific Technique Tabs */}
@@ -241,7 +243,17 @@ export const ScientificMemoryLabView: React.FC = () => {
                 المحاضرة {activeBlurt.lectureId} · تمرين التفريغ الذهني النشط (Blurting Method)
               </span>
 
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <ArabicVoiceButton
+                  id={`blurt-voice-${activeBlurt.id}`}
+                  segments={[
+                    activeBlurt.examQuestionPrompt,
+                    `شفرة التذكر: ${activeBlurt.hintMnemonic}`,
+                    `الإجابة النموذجية الكاملة: ${activeBlurt.modelSummary}`,
+                  ]}
+                  label="استمع للسؤال والإجابة"
+                />
+
                 <button
                   type="button"
                   onClick={() => {
@@ -250,7 +262,7 @@ export const ScientificMemoryLabView: React.FC = () => {
                     }
                     setTimerRunning((prev) => !prev);
                   }}
-                  className={`min-h-[38px] px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer border transition-colors ${
+                  className={`min-h-[36px] px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer border transition-colors ${
                     timerRunning
                       ? 'bg-amber-500 text-slate-950 border-amber-400'
                       : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700'
@@ -264,7 +276,7 @@ export const ScientificMemoryLabView: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowBlurtHint((prev) => !prev)}
-                  className="min-h-[38px] px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-200 cursor-pointer"
+                  className="min-h-[36px] px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-200 cursor-pointer"
                 >
                   {showBlurtHint ? 'إخفاء الشفرة' : 'تلميح الشفرة'}
                 </button>
@@ -430,73 +442,94 @@ export const ScientificMemoryLabView: React.FC = () => {
           </div>
 
           <div className="space-y-4">
-            {STORY_CHAINS_DATA.map((story) => (
-              <article
-                key={story.id}
-                className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 space-y-4 shadow-xs"
-              >
-                <div className="space-y-1">
-                  <span className="text-xs font-semibold text-emerald-700 dark:text-amber-400">
-                    {story.lectureRange} · تقنية الربط القصصي المتسلسل
-                  </span>
-                  <h4 className="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100">
-                    {story.title}
-                  </h4>
+            {STORY_CHAINS_DATA.map((story) => {
+              const storyVoiceSegments = [
+                story.title,
+                story.hook,
+                ...story.scenes.map(
+                  (s) => `المشهد ${s.stepNumber}: ${s.storyCue}. المقابل في الامتحان: ${s.examPoint}`
+                ),
+                `خلاصة القصة: ${story.moralSummary}`,
+              ];
+
+              return (
+                <article
+                  key={story.id}
+                  className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 space-y-4 shadow-xs"
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="space-y-1">
+                      <span className="text-xs font-semibold text-emerald-700 dark:text-amber-400">
+                        {story.lectureRange} · تقنية الربط القصصي المتسلسل
+                      </span>
+                      <h4 className="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100">
+                        {story.title}
+                      </h4>
+                    </div>
+
+                    <ArabicVoiceButton
+                      id={`story-voice-${story.id}`}
+                      segments={storyVoiceSegments}
+                      label="استمع للقصة كاملة"
+                      activeLabel="إيقاف القصة"
+                    />
+                  </div>
+
                   <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-950/70 p-3 rounded-xl border border-slate-200/80 dark:border-slate-800">
                     🎬 مدخل القصة: {story.hook}
                   </p>
-                </div>
 
-                {/* Story Scenes */}
-                <div className="space-y-2.5">
-                  {story.scenes.map((scene) => {
-                    const stepKey = `${story.id}-${scene.stepNumber}`;
-                    const isHidden = storyTestMode && !revealedStorySteps[stepKey];
+                  {/* Story Scenes */}
+                  <div className="space-y-2.5">
+                    {story.scenes.map((scene) => {
+                      const stepKey = `${story.id}-${scene.stepNumber}`;
+                      const isHidden = storyTestMode && !revealedStorySteps[stepKey];
 
-                    return (
-                      <div
-                        key={scene.stepNumber}
-                        className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200/80 dark:border-slate-800/90 space-y-2"
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex items-start gap-2.5">
-                            <span className="w-6 h-6 rounded-full bg-emerald-600 dark:bg-amber-500 text-white dark:text-slate-950 font-mono text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
-                              {scene.stepNumber}
-                            </span>
-                            <p className="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100 leading-relaxed">
-                              مشهد القصة: {scene.storyCue}
-                            </p>
+                      return (
+                        <div
+                          key={scene.stepNumber}
+                          className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200/80 dark:border-slate-800/90 space-y-2"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex items-start gap-2.5">
+                              <span className="w-6 h-6 rounded-full bg-emerald-600 dark:bg-amber-500 text-white dark:text-slate-950 font-mono text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
+                                {scene.stepNumber}
+                              </span>
+                              <p className="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100 leading-relaxed">
+                                مشهد القصة: {scene.storyCue}
+                              </p>
+                            </div>
                           </div>
+
+                          {isHidden ? (
+                            <button
+                              type="button"
+                              onClick={() => toggleStoryStep(stepKey)}
+                              className="w-full py-2.5 px-3 rounded-lg bg-white dark:bg-slate-900 border border-dashed border-slate-300 dark:border-slate-700 text-xs font-semibold text-emerald-700 dark:text-amber-400 hover:border-emerald-500 cursor-pointer text-center"
+                            >
+                              استرجع المعلومة العلمية المرتبطة بهذا المشهد ثم اضغط للكشف ({scene.keyword})
+                            </button>
+                          ) : (
+                            <div className="pr-8 space-y-1">
+                              <p className="text-xs sm:text-sm text-slate-700 dark:text-slate-200 leading-relaxed">
+                                <strong className="text-emerald-700 dark:text-amber-400">
+                                  المقابل في الامتحان:{' '}
+                                </strong>
+                                {scene.examPoint}
+                              </p>
+                            </div>
+                          )}
                         </div>
+                      );
+                    })}
+                  </div>
 
-                        {isHidden ? (
-                          <button
-                            type="button"
-                            onClick={() => toggleStoryStep(stepKey)}
-                            className="w-full py-2.5 px-3 rounded-lg bg-white dark:bg-slate-900 border border-dashed border-slate-300 dark:border-slate-700 text-xs font-semibold text-emerald-700 dark:text-amber-400 hover:border-emerald-500 cursor-pointer text-center"
-                          >
-                            استرجع المعلومة العلمية المرتبطة بهذا المشهد ثم اضغط للكشف ({scene.keyword})
-                          </button>
-                        ) : (
-                          <div className="pr-8 space-y-1">
-                            <p className="text-xs sm:text-sm text-slate-700 dark:text-slate-200 leading-relaxed">
-                              <strong className="text-emerald-700 dark:text-amber-400">
-                                المقابل في الامتحان:{' '}
-                              </strong>
-                              {scene.examPoint}
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-
-                <div className="p-3 rounded-xl bg-emerald-50/70 dark:bg-amber-500/10 border border-emerald-200 dark:border-amber-500/25 text-xs font-bold text-emerald-950 dark:text-amber-200">
-                  💡 خلاصة القصة للامتحان: {story.moralSummary}
-                </div>
-              </article>
-            ))}
+                  <div className="p-3 rounded-xl bg-emerald-50/70 dark:bg-amber-500/10 border border-emerald-200 dark:border-amber-500/25 text-xs font-bold text-emerald-950 dark:text-amber-200">
+                    💡 خلاصة القصة للامتحان: {story.moralSummary}
+                  </div>
+                </article>
+              );
+            })}
           </div>
         </div>
       )}
@@ -533,39 +566,49 @@ export const ScientificMemoryLabView: React.FC = () => {
           </div>
 
           <div className="space-y-3">
-            {CLOZE_DRILLS_DATA.map((item, idx) => (
-              <div
-                key={item.id}
-                className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 sm:p-5 space-y-2 shadow-xs"
-              >
-                <div className="text-xs text-slate-500 dark:text-slate-400">
-                  فقرة تسميع {idx + 1} · المحاضرة {item.lectureId} · {item.category}
+            {CLOZE_DRILLS_DATA.map((item, idx) => {
+              const fullSentence = item.parts.map((p) => p.text).join('');
+              return (
+                <div
+                  key={item.id}
+                  className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 sm:p-5 space-y-2.5 shadow-xs"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs text-slate-500 dark:text-slate-400">
+                      فقرة تسميع {idx + 1} · المحاضرة {item.lectureId} · {item.category}
+                    </span>
+                    <ArabicVoiceButton
+                      id={`cloze-voice-${item.id}`}
+                      segments={[fullSentence]}
+                      label="استمع للفقرة كاملة"
+                    />
+                  </div>
+                  <p className="text-sm sm:text-base text-slate-800 dark:text-slate-200 leading-loose">
+                    {item.parts.map((part, pIdx) => {
+                      if (!part.isBlank) {
+                        return <span key={pIdx}>{part.text}</span>;
+                      }
+                      const key = `${item.id}-${pIdx}`;
+                      const isRevealed = !!revealedClozeKeys[key];
+                      return (
+                        <button
+                          key={pIdx}
+                          type="button"
+                          onClick={() => toggleClozeBlank(key)}
+                          className={`mx-1 px-2.5 py-0.5 rounded-lg font-bold text-xs sm:text-sm transition-all cursor-pointer inline-flex items-center gap-1 ${
+                            isRevealed
+                              ? 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-900 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700'
+                              : 'bg-amber-500/20 dark:bg-amber-500/20 text-amber-900 dark:text-amber-300 border border-dashed border-amber-500 hover:bg-amber-500/30'
+                          }`}
+                        >
+                          {isRevealed ? part.text : 'اضغط لكشف الإجابة'}
+                        </button>
+                      );
+                    })}
+                  </p>
                 </div>
-                <p className="text-sm sm:text-base text-slate-800 dark:text-slate-200 leading-loose">
-                  {item.parts.map((part, pIdx) => {
-                    if (!part.isBlank) {
-                      return <span key={pIdx}>{part.text}</span>;
-                    }
-                    const key = `${item.id}-${pIdx}`;
-                    const isRevealed = !!revealedClozeKeys[key];
-                    return (
-                      <button
-                        key={pIdx}
-                        type="button"
-                        onClick={() => toggleClozeBlank(key)}
-                        className={`mx-1 px-2.5 py-0.5 rounded-lg font-bold text-xs sm:text-sm transition-all cursor-pointer inline-flex items-center gap-1 ${
-                          isRevealed
-                            ? 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-900 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700'
-                            : 'bg-amber-500/20 dark:bg-amber-500/20 text-amber-900 dark:text-amber-300 border border-dashed border-amber-500 hover:bg-amber-500/30'
-                        }`}
-                      >
-                        {isRevealed ? part.text : 'اضغط لكشف الإجابة'}
-                      </button>
-                    );
-                  })}
-                </p>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
@@ -589,9 +632,20 @@ export const ScientificMemoryLabView: React.FC = () => {
                 className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 space-y-3 shadow-xs flex flex-col justify-between"
               >
                 <div className="space-y-2.5">
-                  <span className="text-xs font-semibold text-emerald-700 dark:text-amber-400">
-                    المحاضرة {card.lectureId} · تبسيط فاينمان
-                  </span>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-semibold text-emerald-700 dark:text-amber-400">
+                      المحاضرة {card.lectureId} · تبسيط فاينمان
+                    </span>
+                    <ArabicVoiceButton
+                      id={`feyn-voice-${card.id}`}
+                      segments={[
+                        card.concept,
+                        `التشبيه المبسط: ${card.simpleAnalogy}`,
+                        `فخ الامتحان: ${card.examTrapToAvoid}`,
+                      ]}
+                      label="استمع للشرح"
+                    />
+                  </div>
                   <h4 className="text-base font-bold text-slate-900 dark:text-slate-100">
                     {card.concept}
                   </h4>

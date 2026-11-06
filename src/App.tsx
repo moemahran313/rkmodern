@@ -23,6 +23,7 @@ import { SheetsMemorizerView } from './components/SheetsMemorizerView';
 import { LectureSummariesView } from './components/LectureSummariesView';
 import { PracticeQuizView } from './components/PracticeQuizView';
 import { PWAHeaderAction, OfflineToast, usePWAAndOffline } from './components/PWAInstallModal';
+import { speechManager } from './utils/arabicSpeech';
 
 type ActiveTab = 'flashcards' | 'memorylab' | 'sheets' | 'lectures' | 'quiz';
 
@@ -83,6 +84,10 @@ export default function App() {
       // Ignore storage errors
     }
   }, [isDarkMode]);
+
+  useEffect(() => {
+    speechManager.stop();
+  }, [activeTab]);
 
   // Spaced Repetition state per flashcard
   const [scheduleMap, setScheduleMap] = useState<Record<string, CardScheduleState>>(() => {
